@@ -1,0 +1,489 @@
+package pikselipeli;
+
+import java.awt.*;
+import java.awt.event.*;
+import java.awt.image.*;
+import java.util.ArrayList;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.swing.*;
+
+public class PikseliPeli {
+
+    static JFrame frame;
+    static Screen screen;
+    static KeyHandler keyboard;
+    
+    static boolean isPaused = false;
+    
+    public static void init() {
+        frame = new JFrame("PikseliPeli");
+        
+        frame.setPreferredSize(new Dimension(800, 600));
+        frame.setResizable(false);
+        screen = new Screen();
+        frame.setBackground(Color.WHITE);
+        (frame.getContentPane()).add(screen);
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        
+        keyboard = new KeyHandler();
+        frame.addKeyListener(keyboard);
+        
+        frame.pack();
+        
+        frame.setVisible(true);
+        
+    }
+    
+    public static void main(String[] args) {
+        init();
+        
+        GameHandler.init();
+        
+        Hahmo[] players = new Hahmo[5];
+        
+        
+        int[] keys = {KeyEvent.VK_Q,
+                    KeyEvent.VK_O,
+                    KeyEvent.VK_C,
+                    KeyEvent.VK_M,
+                    KeyEvent.VK_Y};
+        String[] names = {"Q",
+                    "O",
+                    "C",
+                    "M",
+                    "Y"};
+        
+        double px, py;
+
+        for (int i = 0; i <= 4; i+=1) {
+            px = Math.random() * 400.0 + 200.0;
+            py = Math.random() * 300.0 + 150.0;
+            
+            
+            players[i] = new Hahmo(px, py, names[i]);
+        }
+        
+        while (true) {
+            
+            /*
+            if (keyboard.keyHeld(KeyEvent.VK_LEFT)) {player.move(-5.0, 0.0);}
+            if (keyboard.keyHeld(KeyEvent.VK_RIGHT)) {player.move(5.0, 0.0);}
+            if (keyboard.keyHeld(KeyEvent.VK_UP)) {player.move(0.0, 2.0);}
+            if (keyboard.keyHeld(KeyEvent.VK_DOWN)) {player.move(0.0, -2.0);}
+            */
+            
+            if (keyboard.keyUp(KeyEvent.VK_ESCAPE)) {
+                isPaused = !isPaused;
+                GameHandler.lastFrame = System.currentTimeMillis();}
+            
+            
+            
+            if(!isPaused) {
+                for (int i = 0; i <= 4; i+=1) {
+                    if (keyboard.keyHeld(keys[i])) {players[i].move2();}
+                }   
+                GameHandler.updateAll(keyboard);
+            }
+            
+            GameHandler.drawText(20, 20, "ABC LOREM IPSUM?\nYES WE DO! TOTALLY, NOW GO: 0X0042");
+            
+            keyboard.refresh();
+            
+            screen.repaint();
+            
+            try {
+                Thread.sleep(1000/60);
+            } catch (InterruptedException ex) {
+                //Logger.getLogger(PikseliPeli.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            
+        }
+    }
+    
+}
+
+class Screen extends JPanel {
+    
+    public void paintComponent(Graphics g) {
+        g = (Graphics2D) g;
+        g.clearRect(0, 0, 800, 600);
+        GameHandler.drawAll(g);
+    }
+    
+}
+
+class GameHandler {
+    
+    public static ArrayList<GameObject> updateList;
+    public static ArrayList<GameObject> addList;
+    public static ArrayList<GameObject> removeList;
+    
+    public static double frameTime;
+    public static long lastFrame;
+    
+    public static BufferedImage buffer;
+    
+    public static Graphics2D bg;
+    
+    public static void init() {
+        updateList = new ArrayList<GameObject>();
+        removeList = new ArrayList<GameObject>();
+        addList    = new ArrayList<GameObject>();
+        lastFrame = System.currentTimeMillis();
+        
+        buffer = new BufferedImage(800, 600, BufferedImage.TYPE_INT_RGB);
+
+        bg = buffer.createGraphics();
+        
+        PixelText.init();
+    }
+    
+    public static void drawText(int x, int y, String str) {
+        PixelText.drawText(x, y, str, bg);
+    }
+
+    public static void update(KeyHandler keyboard) {
+        frameTime = (double)(System.currentTimeMillis() - lastFrame) / 1000.0;
+        //Add newborns
+        for (GameObject o : addList) {
+            updateList.add(o);
+        }
+        addList.clear();
+        //Do necessary updates
+        for (GameObject o : updateList) {
+            o.update();
+        }
+        //Remove garbage
+        for (GameObject o : removeList) {
+            updateList.remove(o);
+        }
+        removeList.clear();
+        lastFrame = System.currentTimeMillis();
+    }
+    
+    public static void updateAll(KeyHandler keyboard) {
+        
+        bg.setBackground(Color.WHITE);
+        bg.clearRect(0, 0, 800, 600);
+
+        update(keyboard);
+
+        for (GameObject o: updateList) {
+            o.draw(bg);
+        }
+        //bg.drawImage(dump, 0, 0, null);
+        
+        
+        for (GameObject o: updateList) {
+            o.clearInput();
+        }
+    
+    }
+    
+    public static void drawAll(Graphics g) {
+        g.drawImage(buffer, 0, 0, null);
+    }
+    
+}
+
+class GameObject {
+    
+    public double x;
+    public double y;
+    
+
+    public Image sprite;
+    
+    public GameObject() {
+        this.addtoList();
+    }
+    private void addtoList() {
+        GameHandler.addList.add(this);
+    }
+    
+    public void destroy() {
+        GameHandler.removeList.add(this);
+    }
+    
+    public void update() {}
+    
+    public void clearInput() {}
+    
+    public void draw(Graphics2D g) {}
+    
+    public double getAngle(double x1, double y1, double x2, double y2) {
+        return Math.atan2(x2-x1, y2-y1)*180.0 / Math.PI;
+    }
+    
+    public double getDistance(double x1, double y1, double x2, double y2) {
+        return Math.sqrt(Math.pow(Math.abs(x2-x1), 2) + Math.pow(Math.abs(y1 - y2), 2));
+    }
+    
+    public double cos2(double a) {
+        return Math.cos(Math.toRadians(a));
+    }
+    public double sin2(double a) {
+        return Math.sin(Math.toRadians(a));
+    }
+    
+}
+
+
+class Luoti extends GameObject {
+    
+    public double xvel;
+    public double yvel;
+    public double angle;
+    
+    public double size;
+    
+    public Luoti(double x, double y, double a, double s) {
+        super();
+        this.x = x;
+        this.y = y;
+        this.angle = a;
+
+        this.xvel = cos2(a) * s;
+        this.yvel = sin2(a) * s;
+        this.size = 2;
+    }
+    @Override
+    public void update() {
+        this.x += this.xvel * GameHandler.frameTime;
+        this.y += this.yvel * GameHandler.frameTime;
+        this.size += 6 * GameHandler.frameTime;
+        
+        //Check for collisions with players
+        for (GameObject o: GameHandler.updateList) {
+            
+            if (o.getClass() == Hahmo.class) {
+                if ( getDistance(this.x, this.y, o.x, o.y) < 9) {
+                    Hahmo e = (Hahmo) o;
+                    e.health -= (int)this.size * 3;
+                    e.xVel += cos2(this.angle) * this.size * 20.7 ;
+                    e.yVel += sin2(this.angle) * this.size * 20.7 ;
+                    e.angleVel += (Math.random() - 0.5) * this.size * 400;
+                    destroy();
+                }
+            }
+            
+        }
+        
+        if (this.x < -50 || this.x > 850 || this.y < -50 || this.y > 650) {
+            destroy();
+        }
+    }
+    
+    @Override
+    public void draw(Graphics2D g) {
+        g.setColor(Color.BLACK);
+        g.drawLine((int)this.x, (int)this.y, (int)(this.x+cos2(this.angle)*8), (int)(this.y+sin2(this.angle)*8));
+        //g.drawOval((int)this.x-(int)(this.size/2), (int)this.y-(int)(this.size/2), (int)this.size, (int)this.size);
+        //g.drawRect((int)this.x, (int)this.y, 0, 0);
+    }
+}
+
+class Hahmo extends GameObject {
+    
+    public short health;
+    public String name;
+    public double respawnTime;
+    
+    public double xVel;
+    public double yVel;
+    
+    public double angle;
+    public double angleVel;
+    
+    public boolean isMoved;
+    public boolean turnCW;
+    public boolean isStopped;
+    public boolean isStarted;
+    public boolean isDead;
+    
+    public boolean shouldMove;
+    
+    public long hitTimer;
+    
+    public Hahmo(double x, double y, String n) {
+        super();
+        
+        this.health = 100;
+        this.name = n;
+        
+        this.x = x;
+        this.y = y;
+        this.angle = Math.random()*360.0;
+        
+        this.isMoved = false;
+        this.isStopped = true;
+        this.turnCW = true;
+    }
+    
+    public void move(double a, double b) {
+        
+        this.angleVel += a * GameHandler.frameTime;
+        
+        this.xVel += cos2(this.angle) * b * GameHandler.frameTime;
+        this.yVel += sin2(this.angle) * b * GameHandler.frameTime;
+    }
+    
+    public void shoot() {
+        new Luoti(this.x + cos2(this.angle)*16, this.y + sin2(this.angle) * 16, 
+                this.angle, 500.0);
+    }
+    
+    public void move2() {
+        this.shouldMove = true;
+    }
+    
+    public void doMove() {
+        this.isMoved = true;
+        this.isStopped = false;
+        
+        if (this.turnCW) {
+            move(2600.0, 2000.1);
+        } else {
+            move(-2600.0, 2000.1);
+        }
+        if (!this.isStarted) {
+            this.hitTimer = System.currentTimeMillis();
+            this.isStarted = true;
+        }
+    }
+    
+    @Override
+    public void update() {
+        
+        
+        if (respawnTime <= 0) {
+            if (this.shouldMove) {doMove();}
+            
+            this.x += this.xVel * GameHandler.frameTime;
+            this.y += this.yVel * GameHandler.frameTime;
+            this.angle += this.angleVel * GameHandler.frameTime;
+            
+            //this.xVel *= 0.972;
+            //this.yVel *= 0.972;
+            //this.angleVel *= 0.7;
+            
+            this.xVel *= Math.pow(0.002, GameHandler.frameTime);
+            this.yVel *= Math.pow(0.002, GameHandler.frameTime);
+            this.angleVel *= Math.pow(0.00005, GameHandler.frameTime);
+            
+            if (!this.isMoved && !this.isStopped) {
+                this.turnCW = !this.turnCW;
+                
+                if ((System.currentTimeMillis() - this.hitTimer) < 110 ) {
+                    shoot();
+                    //this.turnCW = !this.turnCW;
+                }
+                
+                this.isStopped = true;
+            } else if(!this.isMoved) {
+                this.isStarted = false;
+            }
+            
+            if (this.x < 40) {this.x = 40;}
+            if (this.x > 740){this.x = 740;}
+            if (this.y < 40) {this.y = 40;}
+            if (this.y > 540){this.y = 540;}
+            
+            this.isMoved = false;
+
+            if (health <= 0) {
+                respawnTime = 10;
+                health = 100;
+            }
+        } else {
+            respawnTime -= GameHandler.frameTime;
+        }
+
+    }
+    
+    public void clearInput() {
+        this.shouldMove = false;
+    }
+    
+    @Override
+    public void draw(Graphics2D g) {
+        if (respawnTime <= 0) {
+            g.setColor(Color.BLACK);
+            g.drawOval((int)this.x-8, (int)this.y-8, 16, 16);
+            g.drawLine((int)(this.x + cos2(this.angle)*8), 
+                    (int)(this.y + sin2(this.angle)*8), 
+                    (int)(this.x + cos2(this.angle)*16),
+                    (int)(this.y + sin2(this.angle)*16));
+            
+            g.drawRect((int)this.x - 18, (int)this.y-26, 35, 7);
+            g.fillRect((int)this.x-16, (int)this.y-24, (int)(health/100.0*32.0), 4);
+            
+            GameHandler.drawText((int)this.x, (int)this.y - 42, this.name);
+        }
+    }
+}
+
+//NÄPPÄIMISTÖN KÄSITTELIJÄ
+//KeyHit bugaa! :C
+class KeyHandler implements KeyListener {
+    
+    private ArrayList<Integer> keyPressQueue = new ArrayList<Integer>();
+    private ArrayList<Integer> keyReleaseQueue = new ArrayList<Integer>();
+    
+    
+    private ArrayList<Integer> keyPress = new ArrayList<Integer>();
+    private ArrayList<Integer> keyRelease = new ArrayList<Integer>();
+    private ArrayList<Integer> keyHold = new ArrayList<Integer>();
+
+    //-------------------
+    //Tapahtumien kirjaus
+    @Override
+    public void keyPressed(KeyEvent e) {
+        keyPressQueue.add(e.getKeyCode());
+    }
+    
+    @Override
+    public void keyReleased(KeyEvent e) {
+        keyReleaseQueue.add(e.getKeyCode());
+    }
+    
+    @Override
+    public void keyTyped(KeyEvent e) {
+        
+    }
+    //------------------
+    
+    public boolean keyHeld(int k) {
+        return keyHold.contains(k);
+    }
+    
+    public boolean keyHit(int k) {
+        return keyHold.contains(k);
+    }
+    
+    public boolean keyUp(int k) {
+        return keyRelease.contains(k);
+    }
+    
+    //Päivitä puskuri
+    public void refresh() {
+        keyPress.clear();
+        keyRelease.clear();
+
+        for (int k: keyPressQueue) {
+            if (!keyPress.contains(k)) {keyPress.add(k);}
+            if (!keyHold.contains(k)) {keyHold.add(k);}
+        }
+        
+        for (int k: keyReleaseQueue) {
+            if (!keyRelease.contains(k) && keyHold.contains(k)) {keyRelease.add(k);}
+            Integer o = k;
+            if (keyHold.contains(k)) {keyHold.remove(o);}
+        }
+        
+        keyPressQueue.clear();
+        keyReleaseQueue.clear();
+    }
+    
+}
